@@ -238,3 +238,98 @@
     )
   )
 )
+
+;; READ-ONLY FUNCTIONS
+
+;; Retrieves complete market information
+;; @param market-id: Market identifier
+;; @returns: Market data structure or none
+(define-read-only (get-market (market-id uint))
+  (map-get? markets market-id)
+)
+
+;; Retrieves user prediction details
+;; @param market-id: Market identifier
+;; @param user: User principal address
+;; @returns: Prediction data structure or none
+(define-read-only (get-user-prediction (market-id uint) (user principal))
+  (map-get? user-predictions {market-id: market-id, user: user})
+)
+
+;; Returns current contract STX balance
+;; @returns: Balance in micro-STX
+(define-read-only (get-contract-balance)
+  (stx-get-balance (as-contract tx-sender))
+)
+
+;; Returns current oracle address
+;; @returns: Oracle principal address
+(define-read-only (get-oracle-address)
+  (var-get oracle-address)
+)
+
+;; Returns current minimum stake requirement
+;; @returns: Minimum stake in micro-STX
+(define-read-only (get-minimum-stake)
+  (var-get minimum-stake)
+)
+
+;; Returns current platform fee percentage
+;; @returns: Fee percentage (0-100)
+(define-read-only (get-fee-percentage)
+  (var-get fee-percentage)
+)
+
+;; Returns total number of markets created
+;; @returns: Market counter value
+(define-read-only (get-market-count)
+  (var-get market-counter)
+)
+
+;; ADMINISTRATIVE FUNCTIONS
+
+;; Updates the oracle address for price feeds
+;; @param new-address: New oracle principal
+;; @returns: Success boolean
+(define-public (set-oracle-address (new-address principal))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (not (is-eq new-address (var-get oracle-address))) err-invalid-parameter)
+    (ok (var-set oracle-address new-address))
+  )
+)
+
+;; Updates minimum stake requirement
+;; @param new-minimum: New minimum stake in micro-STX
+;; @returns: Success boolean
+(define-public (set-minimum-stake (new-minimum uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (> new-minimum u0) err-invalid-parameter)
+    (ok (var-set minimum-stake new-minimum))
+  )
+)
+
+;; Updates platform fee percentage
+;; @param new-fee: New fee percentage (0-100)
+;; @returns: Success boolean
+(define-public (set-fee-percentage (new-fee uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (<= new-fee u100) err-invalid-parameter)
+    (ok (var-set fee-percentage new-fee))
+  )
+)
+
+;; Withdraws accumulated platform fees
+;; @param amount: Amount to withdraw in micro-STX
+;; @returns: Withdrawn amount
+(define-public (withdraw-fees (amount uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (<= amount (stx-get-balance (as-contract tx-sender))) 
+              err-insufficient-balance)
+    (try! (as-contract (stx-transfer? amount (as-contract tx-sender) contract-owner)))
+    (ok amount)
+  )
+)
